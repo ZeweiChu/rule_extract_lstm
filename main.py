@@ -12,7 +12,7 @@ from torch.autograd import Variable
 from torch import optim
 
 
-def eval(reader, model, data_split="dev", vocab={}, args={}):
+def eval(reader, model, crit, data_split="dev", vocab={}, args={}):
 	reader.reset_dev()
 	correct_count = 0.
 	total_count = 0.
@@ -36,7 +36,7 @@ def eval(reader, model, data_split="dev", vocab={}, args={}):
 
 	return total_loss, correct_count, total_count
 
-def test(reader, model, data_split="test", vocab={}, args={}):
+def test(reader, model, crit, data_split="test", vocab={}, args={}):
 	reader.reset_test()
 	correct_count = 0.
 	total_count = 0.
@@ -92,7 +92,7 @@ def main(args):
 	while 1:
 		(x, x_mask, y), last_batch = reader.get_batch(data_split="train", vocab=vocab)
 		if last_batch:
-			dev_loss, dev_correct_count, dev_count = eval(reader, model, data_split="dev", vocab=vocab, args=args)
+			dev_loss, dev_correct_count, dev_count = eval(reader, model, crit, data_split="dev", vocab=vocab, args=args)
 			dev_acc = dev_correct_count/dev_count
 			dev_loss = dev_loss/dev_count
 			print("dev accuracy: %f, dev loss: %f" % (dev_acc, dev_loss))
