@@ -9,15 +9,6 @@ def get_args():
     parser.register('type', 'bool', str2bool)
 
     # Basics
-    parser.add_argument('--debug',
-                        type='bool',
-                        default=False,
-                        help='whether it is debug mode')
-
-    parser.add_argument('--test_only',
-                        type='bool',
-                        default=False,
-                        help='test_only: no need to run training process')
 
     parser.add_argument('--random_seed',
                         type=int,
@@ -43,23 +34,6 @@ def get_args():
                         type=str,
                         default="",
                         help='choose the loss criterion')
-    
-
-    parser.add_argument('--check_att',
-                        type=bool,
-                        default=False,
-                        help='only check the att map')
-
-    parser.add_argument('--att_type',
-                        type=str,
-                        default="vanilla",
-                        help='type of attention function')
-
-    parser.add_argument('--checkpoint_path',
-                        type=str,
-                        default=None,
-                        help='checkpoint path')
-
 
 
 
@@ -179,9 +153,9 @@ def get_args():
                         default=100,
                         help='Number of epochs')
 
-    parser.add_argument('--eval_epoch',
+    parser.add_argument('--eval_iterations',
                         type=int,
-                        default=1,
+                        default=10,
                         help='Evaluation on dev set after K epochs')
 
     parser.add_argument('--dropout_rate',
