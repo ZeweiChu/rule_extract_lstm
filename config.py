@@ -10,15 +10,14 @@ def get_args():
 
     # Basics
 
-    parser.add_argument('--random_seed',
-                        type=int,
-                        default=1013,
-                        help='Random seed')
-
     parser.add_argument('--use_cuda',
                         type=int,
                         default=0,
                         help='use cuda GPU or not')
+    parser.add_argument('--decompose_type',
+                        type=str,
+                        default="beta",
+                        help='beta|gamma for decompose type')
 
     parser.add_argument('--model_file',
                         type=str,

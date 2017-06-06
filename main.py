@@ -51,19 +51,22 @@ def test(model, crit, data, vocab={}, index2word={}, args={}):
 			x = x.cuda()
 			y = y.cuda()
 			x_mask = x_mask.cuda()
-		pred, out = model.decompose(x, x_mask)
+		if args.decompose_type == "beta":
+			pred, out = model.decompose(x, x_mask)
+		elif args.decompose_type == "gamma":
+			pred, out = model.additive_decompose(x, x_mask)
 		pred_y = pred.max(1)[1]
 
 
 		out = torch.exp(out).data * 30
 		lengths = x_mask.data.sum(1).long().view(-1)
 		for i in range(B):
-			f_extract_lstm.write("<p>predicted: " + str(pred_y.data[i]))
+			f_extract_lstm.write("<p>predicted: " + str(pred_y.data[i][0]) + " correct label: " + str(y.data[i]))
 			for j in range(lengths[i]):
 				f_extract_lstm.write("<span style='font-size:" + str(out[i][j][pred_y.data[i]][0]) + \
 					"' title='" + str(out[i][j][pred_y.data[i]][0]) + "'>" + str(index2word[x.data[i][j]]) + " </span>")
-			print("<span style='font-size:" + str(out[i][j][pred_y.data[i]][0]) + \
-					"' title='" + str(out[i][j][pred_y.data[i]][0]) + "'>" + str(index2word[x.data[i][j]]) + " </span>")
+			# print("<span style='font-size:" + str(out[i][j][pred_y.data[i]][0]) + \
+					# "' title='" + str(out[i][j][pred_y.data[i]][0]) + "'>" + str(index2word[x.data[i][j]]) + " </span>")
 			f_extract_lstm.write("</p>")
 		# code.interact(local=locals())
 		

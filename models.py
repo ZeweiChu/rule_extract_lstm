@@ -126,11 +126,29 @@ class LSTMModel(nn.Module):
         x = torch.gather(hiddens, 1, lengths).squeeze(1) # batch * length * dimension
         x = self.linear(x)
 
+        out = [outgate * F.tanh(cellgates[:, 0, :])]
+        for i in range(1, T):
+            out.append(outgate * (F.tanh(cellgates[:, i, :] - F.tanh(cellgates[:, i-1, :]))))
+        out = [o.unsqueeze(1) for o in out]
+        out = torch.cat(out, 1)
+        out = self.linear(out.view(B*T, -1)).view(B, T, -1)
+        return x, out
+        
+    def additive_decompose(self, x, x_mask):
+        B, T = x.size()
+        x = self.embed(x)
+        forgetgates, hiddens, cellgates, outgate = self.lstm(x, hx=self.init_hidden(B))
+        lengths = x_mask.sum(1).long()
+        lengths = lengths.unsqueeze(2).expand(B, 1, self.hidden_size) - 1
+        
+        x = torch.gather(hiddens, 1, lengths).squeeze(1) # batch * length * dimension
+        x = self.linear(x)
+
         # code.interact(local=locals())
 
         x_mask = x_mask.unsqueeze(2).expand_as(forgetgates).long()
         forgetgates[x_mask == 0] = 1.
-        cellgates[x_mask == 0] = 1.
+        cellgates[x_mask == 0] = 0.
         for i in range(T-2, -1, -1):
             forgetgates[:, i, :] = forgetgates[:, i+1, :] * forgetgates[:, i, :]
             cellgates[:, i, :] = forgetgates[:, i+1, :] * cellgates[:, i, :]
@@ -142,6 +160,5 @@ class LSTMModel(nn.Module):
         out = torch.cat(out, 1)
         out = self.linear(out.view(B*T, -1)).view(B, T, -1)
         return x, out
-        
 
 
