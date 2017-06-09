@@ -69,7 +69,7 @@ class LSTM(nn.Module):
 
             ingate = F.sigmoid(ingate)
             forgetgate = F.sigmoid(forgetgate)
-            forgetgates.append(forgetgate)
+            forgetgates.append(forgetgate.unsqueeze(1))
             cellgate = F.tanh(cellgate)
             cellgates.append(cellgate.unsqueeze(1))
             outgate = F.sigmoid(outgate)
@@ -81,6 +81,7 @@ class LSTM(nn.Module):
 
         hiddens = torch.cat(hiddens, 1)
         cellgates = torch.cat(cellgates, 1)
+        forgetgates = torch.cat(forgetgates, 1)
         return forgetgates, hiddens, cellgates, outgate
 
 class LSTMModel(nn.Module):
@@ -88,7 +89,7 @@ class LSTMModel(nn.Module):
         super(LSTMModel, self).__init__()
         self.embedding_size = args.embedding_size
         self.hidden_size = args.hidden_size
-        self.embed = nn.Embedding(args.vocab_size, args.embedding_size)
+        self.embed = nn.Embedding(args.vocab_size + 1, args.embedding_size)
         self.lstm = LSTM(self.embedding_size, self.hidden_size)
         self.linear = nn.Linear(self.hidden_size, 2)
 
@@ -115,5 +116,49 @@ class LSTMModel(nn.Module):
         return x #torch.exp(F.log_softmax(x))
         # code.interact(local=locals())
         
+    def decompose(self, x, x_mask):
+        B, T = x.size()
+        x = self.embed(x)
+        forgetgates, hiddens, cellgates, outgate = self.lstm(x, hx=self.init_hidden(B))
+        lengths = x_mask.sum(1).long()
+        lengths = lengths.unsqueeze(2).expand(B, 1, self.hidden_size) - 1
+        
+        x = torch.gather(hiddens, 1, lengths).squeeze(1) # batch * length * dimension
+        x = self.linear(x)
+
+        out = [outgate * F.tanh(cellgates[:, 0, :])]
+        for i in range(1, T):
+            out.append(outgate * (F.tanh(cellgates[:, i, :] - F.tanh(cellgates[:, i-1, :]))))
+        out = [o.unsqueeze(1) for o in out]
+        out = torch.cat(out, 1)
+        out = self.linear(out.view(B*T, -1)).view(B, T, -1)
+        return x, out
+        
+    def additive_decompose(self, x, x_mask):
+        B, T = x.size()
+        x = self.embed(x)
+        forgetgates, hiddens, cellgates, outgate = self.lstm(x, hx=self.init_hidden(B))
+        lengths = x_mask.sum(1).long()
+        lengths = lengths.unsqueeze(2).expand(B, 1, self.hidden_size) - 1
+        
+        x = torch.gather(hiddens, 1, lengths).squeeze(1) # batch * length * dimension
+        x = self.linear(x)
+
+        # code.interact(local=locals())
+
+        x_mask = x_mask.unsqueeze(2).expand_as(forgetgates).long()
+        forgetgates[x_mask == 0] = 1.
+        cellgates[x_mask == 0] = 0.
+        for i in range(T-2, -1, -1):
+            forgetgates[:, i, :] = forgetgates[:, i+1, :] * forgetgates[:, i, :]
+            cellgates[:, i, :] = forgetgates[:, i+1, :] * cellgates[:, i, :]
+        out = [outgate * F.tanh(cellgates[:, 0, :])]
+        # code.interact(local=locals())
+        for i in range(1, T):
+            out.append(outgate * (F.tanh(cellgates[:, i, :] - F.tanh(cellgates[:, i-1, :]))))
+        out = [o.unsqueeze(1) for o in out]
+        out = torch.cat(out, 1)
+        out = self.linear(out.view(B*T, -1)).view(B, T, -1)
+        return x, out
 
 

@@ -20,7 +20,7 @@ class Reader():
         self.test_file = args.test_file
         self.batch_size = args.batch_size
         self.vocab_size = args.vocab_size
-        
+        self.last_line = None
 
     def init_train(self):
         self.fp_train = open(self.train_file, "r")
@@ -81,14 +81,13 @@ class Reader():
 
     def get_batch(self, data_split="train", vocab={}):
         data = []
+        if self.last_line is None:
+            self.last_line = getattr(self, "fp_" + data_split).readline()
+        last_batch = False
         for i in range(self.batch_size):
             line = getattr(self, "fp_" + data_split).readline()
-            # code.interact(local=locals())
-            if not line:
-                self.fp_train.seek(0)
-                return (None, None, None), True
-            # print(line)
-            obj = json.loads(line)
+            # print(self.last_line)
+            obj = json.loads(self.last_line)
             text = obj["text"]
             text = nltk.word_tokenize(text)
             stars = int(obj["stars"])
@@ -96,6 +95,14 @@ class Reader():
                 polarity = 1
             else: 
                 polarity = 0
-            data.append([text, polarity])  
+            data.append([text, polarity]) 
+            # code.interact(local=locals())
+            if not line:
+                self.fp_train.seek(0)
+                last_batch = True
+                self.last_line = None
+                break
+            else:
+                self.last_line = line
             
-        return self.encode_batch(data, vocab), False
+        return self.encode_batch(data, vocab), last_batch

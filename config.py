@@ -9,25 +9,15 @@ def get_args():
     parser.register('type', 'bool', str2bool)
 
     # Basics
-    parser.add_argument('--debug',
-                        type='bool',
-                        default=False,
-                        help='whether it is debug mode')
-
-    parser.add_argument('--test_only',
-                        type='bool',
-                        default=False,
-                        help='test_only: no need to run training process')
-
-    parser.add_argument('--random_seed',
-                        type=int,
-                        default=1013,
-                        help='Random seed')
 
     parser.add_argument('--use_cuda',
                         type=int,
                         default=0,
                         help='use cuda GPU or not')
+    parser.add_argument('--decompose_type',
+                        type=str,
+                        default="beta",
+                        help='beta|gamma for decompose type')
 
     parser.add_argument('--model_file',
                         type=str,
@@ -43,23 +33,6 @@ def get_args():
                         type=str,
                         default="",
                         help='choose the loss criterion')
-    
-
-    parser.add_argument('--check_att',
-                        type=bool,
-                        default=False,
-                        help='only check the att map')
-
-    parser.add_argument('--att_type',
-                        type=str,
-                        default="vanilla",
-                        help='type of attention function')
-
-    parser.add_argument('--checkpoint_path',
-                        type=str,
-                        default=None,
-                        help='checkpoint path')
-
 
 
 
@@ -74,38 +47,15 @@ def get_args():
                         default="data/yelp_academic_dataset_review_dev.json",
                         help='file containing dev data')
 
-
     parser.add_argument('--test_file',
                         type=str,
                         default="data/yelp_academic_dataset_review_test.json",
                         help='file containing test data')
 
-
-    parser.add_argument('--log_file',
+    parser.add_argument('--heatmap_file',
                         type=str,
-                        default=None,
-                        help='log file')
-
-    parser.add_argument('--train_pos_file',
-                        type=str,
-                        default=None,
-                        help='Training pos file')
-
-    parser.add_argument('--dev_pos_file',
-                        type=str,
-                        default=None,
-                        help='Development pos file')
-
-    parser.add_argument('--test_pos_file',
-                        type=str,
-                        default=None,
-                        help='test pos file')
-
-    parser.add_argument('--pre_trained',
-                        type=str,
-                        default=None,
-                        help='Pre-trained model.')
-
+                        default="heatmap.html",
+                        help='heat map file')
 
     parser.add_argument('--vocab_file',
                         type=str,
@@ -176,12 +126,12 @@ def get_args():
 
     parser.add_argument('--num_epochs',
                         type=int,
-                        default=100,
+                        default=10,
                         help='Number of epochs')
 
-    parser.add_argument('--eval_epoch',
+    parser.add_argument('--eval_iterations',
                         type=int,
-                        default=1,
+                        default=1000,
                         help='Evaluation on dev set after K epochs')
 
     parser.add_argument('--dropout_rate',

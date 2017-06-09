@@ -1,5 +1,5 @@
 import config
-from dataloader import Reader
+from dataloader_memory import Reader
 import code
 import pickle
 import os
@@ -12,17 +12,16 @@ from torch.autograd import Variable
 from torch import optim
 
 
-def eval(reader, model, crit, data_split="dev", vocab={}, args={}):
-	reader.reset_dev()
+def eval(model, crit, data, vocab={}, args={}):
 	correct_count = 0.
 	total_count = 0.
 	total_loss = 0.
-	while 1:
-		(x, x_mask, y), last_batch = reader.get_batch(data_split=data_split, vocab=vocab)
+
+	for (x, x_mask, y) in data:
 		B, T = x.shape
-		x = Variable(torch.from_numpy(x)).long()
-		x_mask = Variable(torch.from_numpy(x_mask))
-		y = Variable(torch.from_numpy(y)).long()
+		x = Variable(torch.from_numpy(x), volatile=True).long()
+		x_mask = Variable(torch.from_numpy(x_mask), volatile=True)
+		y = Variable(torch.from_numpy(y), volatile=True).long()
 		if args.use_cuda:
 			x = x.cuda()
 			y = y.cuda()
@@ -36,43 +35,27 @@ def eval(reader, model, crit, data_split="dev", vocab={}, args={}):
 
 	return total_loss, correct_count, total_count
 
-def test(reader, model, crit, data_split="test", vocab={}, args={}):
-	reader.reset_test()
-	correct_count = 0.
-	total_count = 0.
-	total_loss = 0.
-	while 1:
-		(x, x_mask, y), last_batch = reader.get_batch(data_split=data_split, vocab=vocab)
-		B, T = x.shape
-		x = Variable(torch.from_numpy(x)).long()
-		x_mask = Variable(torch.from_numpy(x_mask))
-		y = Variable(torch.from_numpy(y)).long()
-		if args.use_cuda:
-			x = x.cuda()
-			y = y.cuda()
-			x_mask = x_mask.cuda()
-		pred = model(x, x_mask)
-		pred_y = pred.max(1)[1]
-		correct_count += (pred_y == y).data.sum()
-		total_count += B
-		loss = crit(pred, y)
-		total_loss += loss.data[0] * total_count
-
-	return total_loss, correct_count, total_count
+	
 
 def main(args):
-	reader = Reader(args)
-	reader.init_train()
-	if os.path.isfile(args.vocab_file):
+	if os.path.isfile("vocab.pkl") and os.path.isfile("train_data.pkl") and os.path.isfile("dev_data.pkl"):
 		vocab = pickle.load(open("vocab.pkl", "rb"))
+		train_data = pickle.load(open("train_data.pkl", "rb"))
+		dev_data = pickle.load(open("dev_data.pkl", "rb"))
 	else:
+		reader = Reader(args)
+		reader.load_data()
 		vocab = reader.build_dict()
 		pickle.dump(vocab, open("vocab.pkl", "wb"))
+		reader = Reader(args)
+		reader.load_data()
+		reader.encode(vocab)
+		train_data = reader.gen_examples(reader.train_data)
+		pickle.dump(train_data, open("train_data.pkl", "wb"))
+		dev_data = reader.gen_examples(reader.dev_data)
+		pickle.dump(dev_data, open("dev_data.pkl", "wb"))
 
 	index2word = {v: k for k, v in vocab.items()}
-
-	reader.reset_train()
-	reader.init_dev()
 
 	if os.path.isfile(args.model_file):
 		model = torch.load(args.model_file)
@@ -87,12 +70,45 @@ def main(args):
 	optimizer = getattr(optim, args.optimizer)(model.parameters(), lr=learning_rate)
 
 	best_dev_acc = 0.
+	dev_loss, dev_correct_count, dev_count = eval(model, crit, dev_data, vocab=vocab, args=args)
+	dev_acc = dev_correct_count/dev_count
+	dev_loss = dev_loss/dev_count
+	print("dev accuracy: %f, dev loss: %f" % (dev_acc, dev_loss))
+	if dev_acc > best_dev_acc:
+		best_dev_acc = dev_acc
+		print("best dev accuracy: %f" % best_dev_acc)
+		torch.save(model, args.model_file)
+		print("model saved.")
 	epoch = 0
-	batch = 0
+	total_train_batch = len(train_data)
+
+	iteration = 0
 	while 1:
-		(x, x_mask, y), last_batch = reader.get_batch(data_split="train", vocab=vocab)
-		if last_batch:
-			dev_loss, dev_correct_count, dev_count = eval(reader, model, crit, data_split="dev", vocab=vocab, args=args)
+		x, x_mask, y = train_data[iteration % total_train_batch]
+		
+		x = Variable(torch.from_numpy(x)).long()
+		x_mask = Variable(torch.from_numpy(x_mask))
+		y = Variable(torch.from_numpy(y)).long()
+		if args.use_cuda:
+			x = x.cuda()
+			y = y.cuda()
+			x_mask = x_mask.cuda()
+		pred = model(x, x_mask)
+		loss = crit(pred, y)
+
+		# code.interact(local=locals())
+		optimizer.zero_grad()
+		loss.backward()
+		optimizer.step()
+
+		if args.use_cuda:
+			loss = loss.cpu()
+
+		print("iteration %d training loss: %f" %(iteration, loss.data[0]))
+		iteration += 1
+		# code.interact(local=locals())
+		if iteration % args.eval_iterations == 0:
+			dev_loss, dev_correct_count, dev_count = eval(model, crit, dev_data, vocab=vocab, args=args)
 			dev_acc = dev_correct_count/dev_count
 			dev_loss = dev_loss/dev_count
 			print("dev accuracy: %f, dev loss: %f" % (dev_acc, dev_loss))
@@ -102,37 +118,13 @@ def main(args):
 				torch.save(model, args.model_file)
 				print("model saved.")
 
-			epoch += 1
-
-			if epoch >= args.num_epochs:
+			if iteration / total_train_batch >= args.num_epochs:
 				break
-			reader.reset_train()
-		else:
-			x = Variable(torch.from_numpy(x)).long()
-			x_mask = Variable(torch.from_numpy(x_mask))
-			y = Variable(torch.from_numpy(y)).long()
-			if args.use_cuda:
-				x = x.cuda()
-				y = y.cuda()
-				x_mask = x_mask.cuda()
-			pred = model(x, x_mask)
-			loss = crit(pred, y)
-
-			# code.interact(local=locals())
-			optimizer.zero_grad()
-			loss.backward()
-			optimizer.step()
-
-			if args.use_cuda:
-				loss = loss.cpu()
-
-			print("batch %d training loss: %f" %(batch, loss.data[0]))
-			batch += 1
-		# code.interact(local=locals())
 
 
 
 if __name__ == "__main__":
 	args = config.get_args()
 	main(args)
+
 
