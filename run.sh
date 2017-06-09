@@ -1,4 +1,5 @@
 #!/bin/bash
 source activate pytorch35
-python main.py --train_file data/senti.binary.train.txt --dev_file data/senti.binary.dev.txt --test_file data/senti.binary.test.txt --model_file model_hw1.th --learning_rate 0.001 --num_epochs 10
+python main.py --train_file data/train.json --dev_file data/dev.json --test_file data/test.json --model_file model_debug.th --learning_rate 0.001
+
 

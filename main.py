@@ -26,13 +26,32 @@ def eval(model, crit, data, vocab={}, args={}):
 			x = x.cuda()
 			y = y.cuda()
 			x_mask = x_mask.cuda()
-		pred = model(x, x_mask)
+		if args.decompose_type == "beta":
+			pred, out = model.decompose(x, x_mask)
+		elif args.decompose_type == "gamma":
+			pred, out = model.additive_decompose(x, x_mask)
 		pred_y = pred.max(1)[1]
+
+
+		out = torch.exp(out).data * 30
+		lengths = x_mask.data.sum(1).long().view(-1)
+		for i in range(B):
+			f_extract_lstm.write("<p>predicted: " + str(pred_y.data[i][0]) + " correct label: " + str(y.data[i]))
+			for j in range(lengths[i]):
+				f_extract_lstm.write("<span style='font-size:" + str(out[i][j][pred_y.data[i]][0]) + \
+					"' title='" + str(out[i][j][pred_y.data[i]][0]) + "'>" + str(index2word[x.data[i][j]]) + " </span>")
+			# print("<span style='font-size:" + str(out[i][j][pred_y.data[i]][0]) + \
+					# "' title='" + str(out[i][j][pred_y.data[i]][0]) + "'>" + str(index2word[x.data[i][j]]) + " </span>")
+			f_extract_lstm.write("</p>")
+		# code.interact(local=locals())
+		
 		correct_count += (pred_y == y).data.sum()
 		total_count += B
 		loss = crit(pred, y)
 		total_loss += loss.data[0] * total_count
 
+	f_extract_lstm.write("</body></html>")
+	f_extract_lstm.close()
 	return total_loss, correct_count, total_count
 
 	
@@ -74,6 +93,7 @@ def main(args):
 	dev_acc = dev_correct_count/dev_count
 	dev_loss = dev_loss/dev_count
 	print("dev accuracy: %f, dev loss: %f" % (dev_acc, dev_loss))
+
 	if dev_acc > best_dev_acc:
 		best_dev_acc = dev_acc
 		print("best dev accuracy: %f" % best_dev_acc)

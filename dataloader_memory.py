@@ -37,29 +37,47 @@ class Reader():
         self.fp_train = open(self.train_file, "r")
         self.train_data = []
         for line in self.fp_train:
-            line = line.strip().split("\t")
-            text = nltk.word_tokenize(line[0])
-            polarity = int(line[1])
+            # line = line.strip().split("\t")
+            # text = nltk.word_tokenize(line[0])
+            # polarity = int(line[1])
+            obj = json.loads(line)
+            text = obj["text"]
+            text = nltk.word_tokenize(text)
+            stars = int(obj["stars"])
+            if stars >= 3:
+                polarity = 1
+            else: 
+                polarity = 0
             self.train_data.append([text, polarity]) 
 
         self.fp_dev = open(self.dev_file, "r")
         self.dev_data = []
         for line in self.fp_dev:
-            line = line.strip().split("\t")
-            text = nltk.word_tokenize(line[0])
-            polarity = int(line[1])
+            obj = json.loads(line)
+            text = obj["text"]
+            text = nltk.word_tokenize(text)
+            stars = int(obj["stars"])
+            if stars >= 3:
+                polarity = 1
+            else: 
+                polarity = 0
             self.dev_data.append([text, polarity]) 
 
     def load_test_data(self):
         self.fp_test = open(self.test_file, "r")
         self.test_data = []
         for line in self.fp_test:
-            line = line.strip().split("\t")
-            text = nltk.word_tokenize(line[0])
-            polarity = int(line[1])
+
+            obj = json.loads(line)
+            text = obj["text"]
+            text = nltk.word_tokenize(text)
+            stars = int(obj["stars"])
+            if stars >= 3:
+                polarity = 1
+            else: 
+                polarity = 0
             self.test_data.append([text, polarity]) 
 
-   
     def encode(self, vocab, sort_by_len=True):
         for idx, line in enumerate(self.train_data):
             line[0] = [vocab[w] if w in vocab else 0 for w in line[0]]

@@ -131,7 +131,7 @@ def get_args():
 
     parser.add_argument('--eval_iterations',
                         type=int,
-                        default=1000,
+                        default=10,
                         help='Evaluation on dev set after K epochs')
 
     parser.add_argument('--dropout_rate',
